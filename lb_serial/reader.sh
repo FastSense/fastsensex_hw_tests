@@ -1,5 +1,5 @@
 SERIAL=$1
-SLEEP=0.1
+SLEEP=0.5
 DATA=0
 
 if [ -z "$SERIAL" ]
@@ -8,7 +8,7 @@ then
     exit 0
 fi
 
-while [ $DATA -lt 49 ]
+while [ $DATA -lt 10 ]
 do
     read DATA < $SERIAL
     sleep $SLEEP

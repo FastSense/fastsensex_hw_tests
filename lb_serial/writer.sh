@@ -1,7 +1,7 @@
 SERIAL=$1
 READ_DATA=""
 DATA=0
-SLEEP=0.1
+SLEEP=0.5
 
 if [ -z "$SERIAL" ]
 then
@@ -9,12 +9,11 @@ then
     exit 0
 fi
 
-while [ $DATA -lt 50 ]
+while [ $DATA -lt 10 ]
 do
     echo $DATA > $SERIAL
     sleep 0.01
     read -t 3 READ_DATA < $SERIAL
-    #echo "Read_data: $READ_DATA, data $DATA"
 
     if [ "$READ_DATA" == "$(($DATA + 1))" ]
     then

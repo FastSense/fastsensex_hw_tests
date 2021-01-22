@@ -1,6 +1,13 @@
-SERIAL=$1
 SLEEP=0.5
 DATA=0
+
+while getopts s:b: flag 
+do
+    case "${flag}" in
+        s) SERIAL=${OPTARG};;
+        b) BAUDRATE=${OPTARG};;
+    esac
+done
 
 if [ -z "$SERIAL" ]
 then
@@ -8,7 +15,19 @@ then
     exit 0
 fi
 
-while [ $DATA -lt 10 ]
+if [ -z "$BAUDRATE" ]
+then
+    echo "Port baudrate is not set. Set default: 9600"
+    BAUDRATE=9600
+fi
+
+stty -F $SERIAL $BAUDRATE
+if [ $? -eq 0 ]
+then
+    echo "$SERIAL speed success set to: $BAUDRATE"
+fi
+
+while [ $DATA -lt 9 ]
 do
     read DATA < $SERIAL
     sleep $SLEEP

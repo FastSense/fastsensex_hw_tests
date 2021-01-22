@@ -1,7 +1,7 @@
 SERIAL=$1
 READ_DATA=""
 DATA=0
-SLEEP=0.02
+SLEEP=0.1
 
 if [ -z "$SERIAL" ]
 then
@@ -9,25 +9,21 @@ then
     exit 0
 fi
 
-while [ $DATA -lt 100 ]
+while [ $DATA -lt 50 ]
 do
     echo $DATA > $SERIAL
-    read -t 5 READ_DATA < $SERIAL
-    echo $READ_DATA
+    sleep 0.01
+    read -t 3 READ_DATA < $SERIAL
+    #echo "Read_data: $READ_DATA, data $DATA"
 
     if [ "$READ_DATA" == "$(($DATA + 1))" ]
     then
         echo -en "Read: ${READ_DATA}\r"
+        DATA=$READ_DATA
     else
-        if [ $DATA != 0 ]
-        then
-            echo "Verification serial: $SERIAL read failure"
-            echo "Passed data: $DATA, readed data: $READ_DATA"
-        else
-            echo "Unable to read data. Make sure the loopback cable is installed, the port is selected correctly and reader.sh is running."
-        fi
+        echo "Unable to read data. Make sure the loopback cable is installed, the port is selected correctly and reader.sh is running."
         DATA=0
-        echo -en "Read:                 \r"
+        #echo -en "Read:                 \r"
     fi
     sleep $SLEEP
 done

@@ -1,5 +1,6 @@
 SERIAL=$1
-SLEEP=0.01
+SLEEP=0.1
+DATA=0
 
 if [ -z "$SERIAL" ]
 then
@@ -7,10 +8,12 @@ then
     exit 0
 fi
 
-while true
+while [ $DATA -lt 49 ]
 do
     read DATA < $SERIAL
     sleep $SLEEP
-    echo "$(($DATA + 1))" > $SERIAL
-    sleep $SLEEP
+    PASS_DATA=$(($DATA + 1))
+    echo -en "Incremented data: $PASS_DATA\r"
+    echo "$PASS_DATA" > $SERIAL
+    sleep 0.01
 done

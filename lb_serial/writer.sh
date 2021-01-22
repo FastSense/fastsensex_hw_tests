@@ -1,8 +1,7 @@
 SERIAL=$1
 READ_DATA=""
 DATA=0
-SLEEP=0.01
-TEST_STATUS="CHEKING"
+SLEEP=0.02
 
 if [ -z "$SERIAL" ]
 then
@@ -13,13 +12,12 @@ fi
 while [ $DATA -lt 100 ]
 do
     echo $DATA > $SERIAL
-    sleep $SLEEP
     read -t 5 READ_DATA < $SERIAL
+    echo $READ_DATA
 
     if [ "$READ_DATA" == "$(($DATA + 1))" ]
     then
         echo -en "Read: ${READ_DATA}\r"
-        DATA=$READ_DATA
     else
         if [ $DATA != 0 ]
         then

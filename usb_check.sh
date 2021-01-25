@@ -31,7 +31,8 @@ then
 
     if [ $? -eq 0 ]
     then
-        dd if=$DEVICE of=/dev/null bs=1M count=1024 iflag=direct status=progress
+        usb_read_speed=$(dd if=$DEVICE of=/dev/null bs=1M count=1024 iflag=direct 2>&1)
+        echo "USB read sped: ${usb_read_speed##*s, }"
     else
         echo "Something went wrong with the mount..."
     fi

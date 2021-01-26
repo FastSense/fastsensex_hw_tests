@@ -40,7 +40,7 @@ python3 tpu-telemetry.py --d 0
 
 Формат CSV-файла:
 ```
-time,tpu1_temp
+time,tpu0_temp
 2020-05-08T10:55:34.513,55
 2020-05-08T10:55:34.517,55
 ```

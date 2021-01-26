@@ -40,7 +40,22 @@ python3 tpu-telemetry.py --d 0
 
 Формат CSV-файла:
 ```
-time,tpu0_temp
+time,tpu_temp
+2020-05-08T10:55:34.513,55
+2020-05-08T10:55:34.517,55
+```
+
+## Телеметрия на VPU (Myriad)
+
+Запуск (--d имя устройства MYRIAD или полностью MYRIAD.1.7-ma2480)
+```
+source /opt/intel/openvino/bin/setupvars.sh
+python3 vpu-stress.py --d MYRIAD
+```
+
+Формат CSV-файла:
+```
+time,vpu_temp
 2020-05-08T10:55:34.513,55
 2020-05-08T10:55:34.517,55
 ```

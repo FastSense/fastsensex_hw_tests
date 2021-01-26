@@ -34,7 +34,9 @@ time,cpu1_temp,cpu1_freq,cpu1_load,cpu2_temp,cpu2_freq,cpu2_load, ...
 Телеметрия на TPU (Coral)
 
 Запуск (--d номер устройства)
+```
 python3 tpu-telemetry.py --d 0
+```
 
 Формат CSV-файла:
 ```

@@ -5,25 +5,47 @@ SSD_COUNT=$(lspci -d 15B7:5004 | wc -l)
 MYRYAD_COUNT=$(lspci -d 1B73:1100 | wc -l)
 CORAL_COUNT=$(lspci -d 1AC1:089A | wc -l)
 
+
 echo "Found:"
 
 if [ $WIFI_COUNT -ne 0 ]
 then
+    device_speed=$(lspci -vvd 1AC1:089A | grep LnkSta:)
+    device_speed=${device_speed##*LnkSta:}
+    device_speed=${device_speed%%, TrErr*}
+
     echo "WiFi6 AX200 - ${WIFI_COUNT}x"
+    echo -e "\t$device_speed"
 fi
 
 if [ $SSD_COUNT -ne 0 ]
 then
+    device_speed=$(lspci -vvd 1AC1:089A | grep LnkSta:)
+    device_speed=${device_speed##*LnkSta:}
+    device_speed=${device_speed%%, TrErr*}
+
     echo "SSD 128GB WD SN520 - ${SSD_COUNT}x"
+    echo -e "\t$device_speed"
 fi
 
 if [ $MYRYAD_COUNT -ne 0 ]
 then
+    device_speed=$(lspci -vvd 1AC1:089A | grep LnkSta:)
+    device_speed=${device_speed##*LnkSta:}
+    device_speed=${device_speed%%, TrErr*}
+
     echo "Myriad FL1100 - ${MYRYAD_COUNT}x"
+    echo -e "\t$device_speed"
 fi
 
 
-if [ $CORAL_COUNT != '0' ]
+if [ $CORAL_COUNT -ne 0 ]
 then
+    device_speed=$(lspci -vvd 1AC1:089A | grep LnkSta:)
+    device_speed=${device_speed##*LnkSta:}
+    device_speed=${device_speed%%, TrErr*}
+
     echo "Google Coral TPU - ${CORAL_COUNT}x"
+    echo -e "\t$device_speed"
 fi
+

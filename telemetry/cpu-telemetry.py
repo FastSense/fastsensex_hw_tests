@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+from pathlib import Path
 import time
 import csv
 import datetime
@@ -21,7 +22,10 @@ OUTPUT_TEMPLATE = """
 """
 
 def start_logging(csv_file_path: str):
-    with open(csv_file_path, 'w', newline='') as f:
+    path = Path(csv_file_path)
+    path.parents[0].mkdir(parents=True, exist_ok=True)
+
+    with path.open(mode='w', newline='') as f:
         field_names = ['time']
 
         for name in ('temp', 'freq', 'load'):
@@ -51,7 +55,7 @@ def start_logging(csv_file_path: str):
                     row['cpu%d_load' % i] = int(cpu_loads[i])
                 
                 writer.writerow(row)
-
+                f.flush()
                 time.sleep(1)
         except KeyboardInterrupt:
             return
@@ -63,7 +67,10 @@ def load_from_csv(file_path: str):
         
         cpu_count = psutil.cpu_count()
         
-        t, temp, load, freq = [], [[] for t in range(cpu_count)], [[] for t in range(cpu_count)], [[] for t in range(cpu_count)]
+        t = []
+        temp = [[] for t in range(cpu_count)]
+        load = [[] for t in range(cpu_count)]
+        freq = [[] for t in range(cpu_count)]
 
         for row in reader:
             t.append(datetime.datetime.strptime(row['time'], '%Y-%m-%dT%H:%M:%S.%f'))
@@ -75,66 +82,77 @@ def load_from_csv(file_path: str):
         return t, temp, load, freq
 
 
-def save_chart(csv_file_path: str, image_file_path: str):
+def draw_subchart(t, data, ax, yrange, ylabel, label_template='%d', alpha=0.25,
+                  draw_errorbar=False, errorbar_label='mean', start=0, end=-1):
+    ax.grid()
+    ax.set(yticks=yrange, ylabel=ylabel)
+
+    for i in range(len(data)):
+        ax.plot(t, data[i][start:end], alpha=alpha, label=label_template % i)
+    
+    if draw_errorbar and end < 0:
+        r = range(0, len(t), 5)
+        ax.errorbar([t[i] for i in r],
+                    [np.mean([data[j][i] for j in range(len(data))]) for i in r],
+                    [np.std([data[j][i] for j in range(len(data))]) for i in r],
+                    fmt='k-', capthick=1, capsize=3, label=errorbar_label)
+
+    ax.legend()
+
+
+def save_chart(csv_file_path: str, image_file_path: str, start_time='1970-01-01T00:00:00.000',
+               end_time='2100-01-01T00:00:00.000'):
+    start_time = datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S.%f')
+    end_time = datetime.datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S.%f')
+
     t, temp, load, freq = load_from_csv(csv_file_path)
+    
+    start, end = None, len(t) - 1
+
+    for i in range(len(t)):
+        if start is None and t[i] >= start_time:
+            start = i
+        if t[i] <= end_time:
+            end = i
 
     fig, axs = plt.subplots(nrows=3, figsize=(14, 14))
 
-    axs[0].grid()
-    axs[0].set(yticks=range(0, 101, 5), ylabel='CPU temperature, °C')
+    draw_subchart(t[start:end], temp[start:end], axs[0], range(0, 101, 5),
+                  'CPU temperature, °C', 'CPU%d temperature',
+                  1, False, start=start, end=end)
 
-    for i in range(len(temp)):
-        axs[0].plot(t, temp[i], label='CPU%d' % i)
-        
-    axs[0].legend()
+    draw_subchart(t[start:end], load[start:end], axs[1], range(0, 101, 5),
+                  'CPU load, %', 'CPU%d load', 0.25, True,
+                  'CPU load men', start=start, end=end)
 
-
-    axs[1].grid()
-    axs[1].set(yticks=range(0, 101, 5), ylabel='CPU load, %')
-
-    for i in range(len(load)):
-        axs[1].plot(t, load[i], alpha=0.25, label='CPU%d load' % i)
-        
-    r = range(0, len(t), 5)
-    axs[1].errorbar([t[i] for i in r],
-                    [np.mean([load[j][i] for j in range(8)]) for i in r],
-                    [np.std([load[j][i] for j in range(8)]) for i in r],
-                    fmt='k-', capthick=1, capsize=3, label='CPU mean')
-
-    axs[1].legend()
-
-
-    axs[2].grid()
-    axs[2].set(yticks=range(0, 8000, 500), ylabel='CPU frequency, MHz')
-
-    for i in range(len(freq)):
-        axs[2].plot(t, freq[i], alpha=0.25, label='CPU%d freq' % i)
-        
-    r = range(0, len(t), 5)
-    axs[2].errorbar([t[i] for i in r],
-                    [np.mean([freq[j][i] for j in range(8)]) for i in r],
-                    [np.std([freq[j][i] for j in range(8)]) for i in r],
-                    fmt='k-', capthick=1, capsize=3, label='CPU mean')
-
-    axs[2].legend()
+    draw_subchart(t[start:end], freq[start:end], axs[2], range(0, 8000, 500),
+                  'CPU frequency, MHz', 'CPU%d freq', 0.25, True,
+                  'CPU frequency men', start=start, end=end)
 
     plt.savefig(image_file_path)
 
 
 if __name__ == '__main__':
-    default_filename = datetime.datetime.now().strftime('cpu_%Y-%m-%d_%H-%M-%S')
+    default_filename = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime('cpu_%Y-%m-%d_%H-%M-%S'))
 
     parser = argparse.ArgumentParser(description='CPU telemetry.')
     parser.add_argument('--stress', action='store_true', help='run stress-test or not')
     parser.add_argument('--out', type=str, default=default_filename + '.csv', help='csv-file save path')
     parser.add_argument('--chart', type=str, default=default_filename + '.png', help='path to save the chart')
+    parser.add_argument('--plot', action='store_true', help='plot chart from the specified csv-table')
+    parser.add_argument('--csv', type=str, help='csv-file path for chart plotting')
+    parser.add_argument('--from_time', type=str, help='start-time for chart plotting')
+    parser.add_argument('--to_time', type=str, help='end-time for chart plotting')
 
     args = parser.parse_args()
 
-    if args.stress:
-        with os.popen('stress --cpu %d' % psutil.cpu_count()) as p:
-            start_logging(args.out)
-            save_chart(args.out, args.chart)
+    if args.plot or args.stress:
+        if args.plot:
+            save_chart(args.csv, args.chart, args.from_time, args.to_time)
+        elif args.stress:
+            with os.popen('stress --cpu %d' % psutil.cpu_count()) as p:
+                start_logging(args.out)
+                save_chart(args.out, args.chart)
     else:
         start_logging(args.out)
         save_chart(args.out, args.chart)

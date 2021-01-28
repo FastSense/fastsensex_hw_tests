@@ -9,6 +9,7 @@ fi
 WIFI_ID="8086:2723"
 SSD_ID="15B7:5004"
 MYRYAD_ID="1B73:1100"
+MYRYAD_USB_ID="03e7:2485"
 CORAL_ID="1AC1:089A"
 
 WIFI_COUNT=$(lspci -d $WIFI_ID | wc -l)
@@ -32,10 +33,20 @@ print_devices() {
         device_speed=${device_speed##*LnkSta:}
         device_speed=${device_speed%%, TrErr*}
         echo "  ${names[$i]}: ${device_speed}"
+        if [ $1 == $MYRYAD_ID ]
+        then
+            print_usb_devices
+        fi
         i=$(($i+1))
     done < <(lspci -vvd $1 | grep LnkSta:)
 }
 
+print_usb_devices() {
+    while read -r usb_device
+    do
+        echo "    USB: $usb_device"
+    done < <(lsusb | grep "$MYRYAD_USB_ID")
+}
 
 echo "Found:"
 

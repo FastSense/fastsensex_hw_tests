@@ -11,11 +11,8 @@ fi
 MYPATH=${MYPATH%%autostart*}
 
 TELEMETRY_PATH=${MYPATH%%includes*}
-sed -i "s|path_to_cpu_telemetry|$TELEMETRY_PATH$CPU.py|" "$MYPATH$CPU.service"
-sed -i "s|path_to_tpu_telemetry|$TELEMETRY_PATH$TPU.py|" "$MYPATH$TPU.service"
-
-mv $MYPATH/$CPU.service /etc/systemd/system/
-mv $MYPATH/$TPU.service /etc/systemd/system/
+sed "s|path_to_cpu_telemetry|$TELEMETRY_PATH$CPU.py|" "$MYPATH$CPU.service" > "/etc/systemd/system/$CPU.service"
+sed "s|path_to_tpu_telemetry|$TELEMETRY_PATH$TPU.py|" "$MYPATH$TPU.service" > "/etc/systemd/system/$TPU.service"
 
 systemctl enable $CPU
 systemctl enable $TPU

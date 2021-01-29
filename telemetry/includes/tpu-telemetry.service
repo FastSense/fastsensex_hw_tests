@@ -1,5 +1,5 @@
 [Unit]
-Description=Simple bash script
+Description=TPU telemetry logger
 
 [Service]
 User=robot

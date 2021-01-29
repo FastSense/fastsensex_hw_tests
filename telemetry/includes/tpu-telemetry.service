@@ -1,0 +1,9 @@
+[Unit]
+Description=Simple bash script
+
+[Service]
+User=robot
+ExecStart=/usr/bin/python3 path_to_tpu_telemetry
+
+[Install]
+WantedBy=multi-user.target

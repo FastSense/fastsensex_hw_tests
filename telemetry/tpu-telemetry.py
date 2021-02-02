@@ -18,10 +18,14 @@ print(f"device for temperature readings /sys/class/apex/apex_{args.d}")
 
 default_filename = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime(f"tpu{args.d}_Y-%m-%d_%H-%M-%S")) + '.csv'
 
+
+
 if not args.out:
     path = Path(default_filename)
 else:
     path = Path(args.out)
+
+path.parents[0].mkdir(parents=True, exist_ok=True)
 
 with path.open(mode='w', newline='') as f:
     field_names = ['time']

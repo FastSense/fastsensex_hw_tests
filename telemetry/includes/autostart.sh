@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ "$EUID" -ne 0 ]
+then
+    echo "Please run as root"
+    exit 0
+fi
+
 CPU="cpu-telemetry"
 TPU="tpu-telemetry"
 

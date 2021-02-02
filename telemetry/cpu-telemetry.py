@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import os
-from pathlib import Path
 import time
 import csv
 import datetime
 import argparse
+from pathlib import Path
+from zipfile import ZipFile
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -14,6 +15,10 @@ import psutil
 
 start_time = time.time()
 
+# Max log size in bytes (10Mb)
+max_logs_size = 1024 * 1024 * 10
+
+
 OUTPUT_TEMPLATE = """
 \033[93m%.3fs\033[0m
 \033[92mTemp:\t\033[1m%7.2f\033[0m\033[92m°C\033[0m    %r
@@ -21,52 +26,65 @@ OUTPUT_TEMPLATE = """
 \033[92mFreq:\t\033[1m%8.2f\033[0m \033[92mMHz\033[0m %r
 """
 
+
 def start_logging(csv_file_path: str):
-    path = Path(csv_file_path)
-    path.parents[0].mkdir(parents=True, exist_ok=True)
+    check_size_time = 0
+    while True:
+        path = Path(csv_file_path)
+        path.parents[0].mkdir(parents=True, exist_ok=True)
 
-    with path.open(mode='w', newline='') as f:
-        field_names = ['time']
+        with path.open(mode='w', newline='') as f:
+            field_names = ['time']
 
-        for name in ('temp', 'freq', 'load'):
-            field_names += ['cpu%d_%s' % (i, name) for i in range(psutil.cpu_count())]
-        
-        writer = csv.DictWriter(f, fieldnames=field_names)
+            for name in ('temp', 'freq', 'load'):
+                field_names += ['cpu%d_%s' % (i, name) for i in range(psutil.cpu_count())]
 
-        writer.writeheader()
+            writer = csv.DictWriter(f, fieldnames=field_names)
 
-        try:
-            while True:
-                t = time.time() - start_time
-                temp = [temp.current for temp in psutil.sensors_temperatures()['coretemp'] if 'CORE' in temp.label.upper()]
-                cpu_loads = psutil.cpu_percent(percpu=True)
-                cpu_load = psutil.cpu_percent()
-                cpu_freqs = [f.current for f in psutil.cpu_freq(percpu=True)]
-                cpu_freq = psutil.cpu_freq().current
+            writer.writeheader()
 
-                print(OUTPUT_TEMPLATE % (t, max(temp), temp, cpu_load,
-                                        cpu_loads, cpu_freq, cpu_freqs))
+            try:
+                while True:
+                    t = time.time() - start_time
+                    temp = [temp.current for temp in psutil.sensors_temperatures()['coretemp'] if 'CORE' in temp.label.upper()]
+                    cpu_loads = psutil.cpu_percent(percpu=True)
+                    cpu_load = psutil.cpu_percent()
+                    cpu_freqs = [f.current for f in psutil.cpu_freq(percpu=True)]
+                    cpu_freq = psutil.cpu_freq().current
 
-                row = {'time': datetime.datetime.now().isoformat(timespec='milliseconds')}
+                    print(OUTPUT_TEMPLATE % (t, max(temp), temp, cpu_load,
+                                            cpu_loads, cpu_freq, cpu_freqs))
 
-                for i in range(psutil.cpu_count()):
-                    row['cpu%d_temp' % i] = int(temp[i])
-                    row['cpu%d_freq' % i] = int(cpu_freqs[i])
-                    row['cpu%d_load' % i] = int(cpu_loads[i])
-                
-                writer.writerow(row)
-                f.flush()
-                time.sleep(1)
-        except KeyboardInterrupt:
-            return
+                    row = {'time': datetime.datetime.now().isoformat(timespec='milliseconds')}
+
+                    for i in range(psutil.cpu_count()):
+                        row['cpu%d_temp' % i] = int(temp[i])
+                        row['cpu%d_freq' % i] = int(cpu_freqs[i])
+                        row['cpu%d_load' % i] = int(cpu_loads[i])
+
+                    writer.writerow(row)
+                    f.flush()
+
+                    if check_size_time < time.time():
+                        check_size_time = time.time() + 10
+                        if check_logs_size(path):
+                            break
+
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                return
+
+        archive_logs(path)
+        csv_file_path = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime('cpu_%Y-%m-%d_%H-%M-%S')) + '.csv'
+
 
 
 def load_from_csv(file_path: str):
     with open(file_path, 'r') as csv_file:
         reader = csv.DictReader(csv_file)
-        
+
         cpu_count = psutil.cpu_count()
-        
+
         t = []
         temp = [[] for t in range(cpu_count)]
         load = [[] for t in range(cpu_count)]
@@ -89,7 +107,7 @@ def draw_subchart(t, data, ax, yrange, ylabel, label_template='%d', alpha=0.25,
 
     for i in range(len(data)):
         ax.plot(t, data[i][start:end], alpha=alpha, label=label_template % i)
-    
+
     if draw_errorbar and end < 0:
         r = range(0, len(t), 5)
         ax.errorbar([t[i] for i in r],
@@ -106,7 +124,7 @@ def save_chart(csv_file_path: str, image_file_path: str, start_time='1970-01-01T
     end_time = datetime.datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S.%f')
 
     t, temp, load, freq = load_from_csv(csv_file_path)
-    
+
     start, end = None, len(t) - 1
 
     for i in range(len(t)):
@@ -130,6 +148,25 @@ def save_chart(csv_file_path: str, image_file_path: str, start_time='1970-01-01T
                   'CPU frequency men', start=start, end=end)
 
     plt.savefig(image_file_path)
+
+
+def check_logs_size(path):
+    logs_size = 0
+
+    for log in path.parents[0].glob('cpu_*'):
+        logs_size += log.stat().st_size
+
+    if logs_size > max_logs_size:
+        return True
+    else:
+        return False
+
+
+def archive_logs(path):
+    with ZipFile(str(Path.home() / '.telemetry/cpu_old.zip', 'w')) as archive:
+        for log in path.parents[0].glob('cpu_*'):
+            archive.write(log)
+            os.remove(log)
 
 
 if __name__ == '__main__':

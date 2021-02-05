@@ -5,6 +5,7 @@ import time
 import csv
 import datetime
 import argparse
+import socket
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -163,19 +164,20 @@ def check_logs_size(path):
 
 
 def archive_logs(path):
-    arhive_name = "{}/old_tpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
-
-    old_archives = list(path.glob('old_tpu*'))
-    if len(old_archives) > 0:
-        for archive in old_archives:
-            os.remove(archive)
+    arhive_name = "{}/old_cpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
 
     with ZipFile(arhive_name, 'w') as archive:
-        for log in path.glob('tpu*'):
+        for log in path.glob('cpu*'):
             archive.write(log)
             os.remove(log)
 
     samba_log_upload(arhive_name, device_name)
+
+    old_archives = list(path.glob('old_cpu*'))
+    if len(old_archives) > 0:
+        for archive in old_archives:
+            os.remove(archive)
+
 
 
 def samba_log_upload(input_files, device_name):

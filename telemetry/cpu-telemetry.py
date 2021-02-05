@@ -96,7 +96,7 @@ def load_from_csv(file_path: str):
                 temp[i].append(float(row['cpu%d_temp' % i]))
                 load[i].append(float(row['cpu%d_load' % i]))
                 freq[i].append(float(row['cpu%d_freq' % i]))
-                
+
         return t, temp, load, freq
 
 
@@ -163,10 +163,37 @@ def check_logs_size(path):
 
 
 def archive_logs(path):
-    with ZipFile(str(Path.home() / '.telemetry/cpu_old.zip', 'w')) as archive:
-        for log in path.parents[0].glob('cpu_*'):
+    arhive_name = "{}/old_tpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
+
+    old_archives = list(path.glob('old_tpu*'))
+    if len(old_archives) > 0:
+        for archive in old_archives:
+            os.remove(archive)
+
+    with ZipFile(arhive_name, 'w') as archive:
+        for log in path.glob('tpu*'):
             archive.write(log)
             os.remove(log)
+
+    samba_log_upload(arhive_name, device_name)
+
+
+def samba_log_upload(input_files, device_name):
+    if not isinstance(input_files, list):
+        input_files = [input_files]
+
+    for file in input_files:
+        if not isinstance(file, list):
+            file = Path(file)
+
+        output_file = "/telemetry/{}/{}".format(device_name, file.name)
+        load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put \"{}\" \"{}\"'".format(samba_server_ip,
+                                                                                                                         samba_login,
+                                                                                                                         samba_password,
+                                                                                                                         device_name,
+                                                                                                                         file,
+                                                                                                                         output_file),
+                                    shell=True)
 
 
 if __name__ == '__main__':

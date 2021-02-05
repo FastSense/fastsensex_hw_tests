@@ -6,6 +6,7 @@ import datetime
 import csv
 import argparse
 import subprocess
+import socket
 from pathlib import Path
 from zipfile import ZipFile
 from contextlib import ExitStack
@@ -13,6 +14,11 @@ from contextlib import ExitStack
 
 # Max log size in bytes (10Mb)
 max_logs_size = 1024 * 1024 * 10
+device_name = socket.gethostname()
+
+samba_server_ip = "192.168.194.51"
+samba_login = "admin"
+samba_password = "FastDakota21"
 
 
 def start_logging(log_file_path, device):
@@ -23,8 +29,7 @@ def start_logging(log_file_path, device):
     device_ids = check_devices()
 
     while True:
-        #path = Path(csv_file_path)
-        #path.parents[0].mkdir(parents=True, exist_ok=True)
+        log_file_path.mkdir(parents=True, exist_ok=True)
         devices = []
 
         log_file_names = log_file_path_gen(log_file_path, device_ids)
@@ -81,10 +86,19 @@ def check_logs_size(path):
 
 
 def archive_logs(path):
-    with ZipFile("{}/.telemetry/old_tpu.zip".format(Path.home()), 'w') as archive:
+    arhive_name = "{}/old_tpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
+
+    old_archives = list(path.glob('old_tpu*'))
+    if len(old_archives) > 0:
+        for archive in old_archives:
+            os.remove(archive)
+
+    with ZipFile(arhive_name, 'w') as archive:
         for log in path.glob('tpu*'):
             archive.write(log)
             os.remove(log)
+
+    samba_log_upload(arhive_name, device_name)
 
 
 def log_file_path_gen(logs_file_path, device_ids):
@@ -92,6 +106,21 @@ def log_file_path_gen(logs_file_path, device_ids):
     for device_id in device_ids:
         paths.append("{}/{}.csv".format(logs_file_path, datetime.datetime.now().strftime(f"tpu{device_id}_Y-%m-%d_%H-%M-%S")))
     return paths
+
+
+def samba_log_upload(input_files, device_name):
+    if isinstance(input_files, list):
+        input_files = [input_files]
+
+    for file in input_files:
+        output_file = "/telemetry/{}/{}".format(device_name, file.name)
+        load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put \"{}\" \"{}\"'".format(samba_server_ip,
+                                                                                                                         samba_login,
+                                                                                                                         samba_password,
+                                                                                                                         device_name,
+                                                                                                                         file,
+                                                                                                                         output_file),
+                                    shell=True)
 
 
 if __name__ == '__main__':

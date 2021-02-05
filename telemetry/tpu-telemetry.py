@@ -13,8 +13,12 @@ from contextlib import ExitStack
 
 
 # Max log size in bytes (10Mb)
-max_logs_size = 1024 * 1024 * 10
+max_logs_size = 1024 * 1
+
+datetime_format = "Y-%m-%d_%H-%M-%S"
+
 device_name = socket.gethostname()
+target = "tpu"
 
 samba_server_ip = "192.168.194.51"
 samba_login = "admin"
@@ -25,6 +29,8 @@ def start_logging(log_file_path, device):
     field_names = ['time']
     field_names.append('tpu_temp')
     check_size_time = 0
+
+    check_old_logs(log_file_path)
 
     device_ids = check_devices()
 
@@ -40,7 +46,7 @@ def start_logging(log_file_path, device):
                 writer = csv.DictWriter(log_file, fieldnames=field_names)
                 writer.writeheader()
 
-                temp_process = temp_process_stack.enter_context(open("/sys/class/apex/apex_{}/temp".format(device_ids[id_num]), 'r'))
+                temp_process = temp_process_stack.enter_context(open(f"/sys/class/apex/apex_{device_ids[id_num]}/temp", 'r'))
 
                 devices.append((log_file, writer, temp_process))
 
@@ -62,7 +68,7 @@ def start_logging(log_file_path, device):
 
                 time.sleep(1)
 
-        archive_logs(log_file_path)
+        check_old_logs(log_file_path, archive=True)
 
 
 def check_devices():
@@ -73,53 +79,89 @@ def check_devices():
     return device_ids
 
 
-def check_logs_size(path):
+def check_logs_size(log_path):
     logs_size = 0
 
-    for log in path.glob('tpu*'):
+    for log in log_path.glob(f"{target}*"):
         logs_size += log.stat().st_size
 
     if logs_size > max_logs_size:
+        delete_old(log_path, delete='archive')
         return True
     else:
         return False
 
 
-def archive_logs(path):
-    arhive_name = "{}/old_tpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
+def archive_logs(log_path, first_time, last_time):
+    arhive_name = f"{log_path}/old_{target}.{first_time}-{last_time}.zip"
 
     with ZipFile(arhive_name, 'w') as archive:
-        for log in path.glob('tpu*'):
+        for log in log_path.glob(f"{target}*"):
             archive.write(log)
             os.remove(log)
 
-    samba_log_upload(arhive_name, device_name)
+    samba_log_upload(arhive_name)
 
-    old_archives = list(path.glob('old_tpu*'))
-    if len(old_archives) > 0:
-        for archive in old_archives:
+
+def delete_old(log_path, delete='log'):
+    if delete == 'archive':
+        olds = list(log_path.glob(f"old_{target}*"))
+    elif delete == 'log':
+        olds = list(log_path.glob(f"{target}*"))
+
+    if len(olds) > 0:
+        for archive in olds:
             os.remove(archive)
 
 
 def log_file_path_gen(logs_file_path, device_ids):
+    # Generate string paths to devices
     paths = []
     for device_id in device_ids:
-        paths.append("{}/{}.csv".format(logs_file_path, datetime.datetime.now().strftime(f"tpu{device_id}_Y-%m-%d_%H-%M-%S")))
+        paths.append("{}/{}.csv".format(logs_file_path, datetime.datetime.now().strftime(f"{target}{device_id}_{datetime_format}")))
     return paths
 
 
-def samba_log_upload(input_files, device_name):
-    if isinstance(input_files, list):
+def check_old_logs(log_path, archive=False):
+    current_time = datetime.datetime.now()
+    first_log_time = current_time
+    last_log_time = current_time
+
+    for old_log in log_path.glob(f"{target}*"):
+        file_time = old_log.stem
+        # Divides the string according to the standard time format
+        # Searches for the first occurrence of a letter specifying the year 'Y'
+        file_time = file_time[file_time.find('Y'):]
+        file_time = datetime.datetime.strptime(file_time, datetime_format)
+        print(file_time)
+
+        if file_time < first_log_time:
+            first_log_time = file_time
+        if file_time > last_log_time:
+            last_log_time = file_time
+
+        if file_time.day + 2 < current_time.day:
+            archive = True
+
+    if archive:
+        archive_logs(log_path, first_log_time.strftime(f"{datetime_format[2:]}"), last_log_time.strftime(f"{datetime_format[2:]}"))
+
+
+def samba_log_upload(input_files):
+    if not isinstance(input_files, list):
         input_files = [input_files]
 
     for file in input_files:
-        output_file = "/telemetry/{}/{}".format(device_name, file.name)
-        load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put \"{}\" \"{}\"'".format(samba_server_ip,
-                                                                                                                         samba_login,
-                                                                                                                         samba_password,
-                                                                                                                         device_name,
-                                                                                                                         file,
-                                                                                                                         output_file),
+        if not isinstance(input_files, Path):
+            file = Path(file)
+
+        output_file = f"/telemetry/{device_name}/{file.name}"
+        load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put {} {}'".format(samba_server_ip,
+                                                                                                                 samba_login,
+                                                                                                                 samba_password,
+                                                                                                                 device_name,
+                                                                                                                 file,
+                                                                                                                 output_file),
                                     shell=True)
 
 

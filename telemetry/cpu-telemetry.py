@@ -179,7 +179,6 @@ def archive_logs(path):
             os.remove(archive)
 
 
-
 def samba_log_upload(input_files, device_name):
     if not isinstance(input_files, list):
         input_files = [input_files]

@@ -18,7 +18,7 @@ import psutil
 start_time = time.time()
 
 # Max log size in bytes (10Mb)
-max_logs_size = 1024 * 1
+max_logs_size = 1024 * 1024 * 10
 
 datetime_format = "Y-%m-%d_%H-%M-%S"
 

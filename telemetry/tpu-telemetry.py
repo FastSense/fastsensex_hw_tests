@@ -14,7 +14,7 @@ from log_processing_utils import LogProcessing
 
 
 # Max log size in bytes (10Mb)
-max_logs_size = 1024 * 1
+max_logs_size = 1024 * 1024 * 10
 
 datetime_format = "Y-%m-%d_%H-%M-%S"
 
@@ -43,7 +43,7 @@ def start_logging(log_file_path, device):
         log_file_path.mkdir(parents=True, exist_ok=True)
         devices = []
 
-        log_file_names = log_file_path_gen(log_file_path, device_ids)
+        log_file_names = lprocessor.log_file_path_gen(log_file_path, device_ids)
 
         with ExitStack() as file_stack, ExitStack() as temp_process_stack:
             for id_num in range(len(device_ids)):

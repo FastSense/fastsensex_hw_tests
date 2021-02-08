@@ -73,7 +73,7 @@ def start_logging(log_file_path, device):
 
                 time.sleep(1)
 
-        lprocessor.check_old_logs(log_file_path, archive=True)
+        lprocessor.check_old_logs(archive=True)
 
 
 def check_devices():

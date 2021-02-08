@@ -12,13 +12,22 @@ from zipfile import ZipFile
 import numpy as np
 from matplotlib import pyplot as plt
 
+from log_processing_utils import LogProcessing
 import psutil
 
 start_time = time.time()
 
 # Max log size in bytes (10Mb)
-max_logs_size = 1024 * 1024 * 10
+max_logs_size = 1024 * 1
 
+datetime_format = "Y-%m-%d_%H-%M-%S"
+
+device_name = socket.gethostname()
+target = "cpu"
+
+samba_server_ip = "192.168.194.51"
+samba_login = "admin"
+samba_password = "FastDakota21"
 
 OUTPUT_TEMPLATE = """
 \033[93m%.3fs\033[0m
@@ -30,9 +39,16 @@ OUTPUT_TEMPLATE = """
 
 def start_logging(csv_file_path: str):
     check_size_time = 0
+
+    lprocessor = LogProcessing(Path(csv_file_path).parents[0], target, device_name, datetime_format, max_logs_size)
+    lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
+
+    lprocessor.check_old_logs()
+
     while True:
         path = Path(csv_file_path)
         path.parents[0].mkdir(parents=True, exist_ok=True)
+
 
         with path.open(mode='w', newline='') as f:
             field_names = ['time']
@@ -68,16 +84,15 @@ def start_logging(csv_file_path: str):
 
                     if check_size_time < time.time():
                         check_size_time = time.time() + 10
-                        if check_logs_size(path):
+                        if lprocessor.check_logs_size():
                             break
 
                     time.sleep(1)
             except KeyboardInterrupt:
                 return
 
-        archive_logs(path)
-        csv_file_path = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime('cpu_%Y-%m-%d_%H-%M-%S')) + '.csv'
-
+        lprocessor.check_old_logs(archive=True)
+        csv_file_path = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime(f"{target}_{datetime_format}")) + '.csv'
 
 
 def load_from_csv(file_path: str):
@@ -92,7 +107,7 @@ def load_from_csv(file_path: str):
         freq = [[] for t in range(cpu_count)]
 
         for row in reader:
-            t.append(datetime.datetime.strptime(row['time'], '%Y-%m-%dT%H:%M:%S.%f'))
+            t.append(datetime.datetime.strptime(row['time'], datetime_format))
             for i in range(cpu_count):
                 temp[i].append(float(row['cpu%d_temp' % i]))
                 load[i].append(float(row['cpu%d_load' % i]))
@@ -121,8 +136,8 @@ def draw_subchart(t, data, ax, yrange, ylabel, label_template='%d', alpha=0.25,
 
 def save_chart(csv_file_path: str, image_file_path: str, start_time='1970-01-01T00:00:00.000',
                end_time='2100-01-01T00:00:00.000'):
-    start_time = datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%S.%f')
-    end_time = datetime.datetime.strptime(end_time, '%Y-%m-%dT%H:%M:%S.%f')
+    start_time = datetime.datetime.strptime(start_time, datetime_format)
+    end_time = datetime.datetime.strptime(end_time, datetime_format)
 
     t, temp, load, freq = load_from_csv(csv_file_path)
 
@@ -151,54 +166,8 @@ def save_chart(csv_file_path: str, image_file_path: str, start_time='1970-01-01T
     plt.savefig(image_file_path)
 
 
-def check_logs_size(path):
-    logs_size = 0
-
-    for log in path.parents[0].glob('cpu_*'):
-        logs_size += log.stat().st_size
-
-    if logs_size > max_logs_size:
-        return True
-    else:
-        return False
-
-
-def archive_logs(path):
-    arhive_name = "{}/old_cpu_{}.zip".format(path, datetime.datetime.now().strftime(f"Y-%m-%d_%H-%M-%S"))
-
-    with ZipFile(arhive_name, 'w') as archive:
-        for log in path.glob('cpu*'):
-            archive.write(log)
-            os.remove(log)
-
-    samba_log_upload(arhive_name, device_name)
-
-    old_archives = list(path.glob('old_cpu*'))
-    if len(old_archives) > 0:
-        for archive in old_archives:
-            os.remove(archive)
-
-
-def samba_log_upload(input_files, device_name):
-    if not isinstance(input_files, list):
-        input_files = [input_files]
-
-    for file in input_files:
-        if not isinstance(file, list):
-            file = Path(file)
-
-        output_file = "/telemetry/{}/{}".format(device_name, file.name)
-        load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put \"{}\" \"{}\"'".format(samba_server_ip,
-                                                                                                                         samba_login,
-                                                                                                                         samba_password,
-                                                                                                                         device_name,
-                                                                                                                         file,
-                                                                                                                         output_file),
-                                    shell=True)
-
-
 if __name__ == '__main__':
-    default_filename = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime('cpu_%Y-%m-%d_%H-%M-%S'))
+    default_filename = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime(f"{target}_{datetime_format}"))
 
     parser = argparse.ArgumentParser(description='CPU telemetry.')
     parser.add_argument('--stress', action='store_true', help='run stress-test or not')

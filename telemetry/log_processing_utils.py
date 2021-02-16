@@ -25,7 +25,6 @@ class LogProcessing():
             logs_size += log.stat().st_size
 
         if logs_size > self.max_log_size:
-            self.delete_old(delete='archive')
             return True
         else:
             return False
@@ -35,15 +34,21 @@ class LogProcessing():
 
         with ZipFile(arhive_name, 'w') as archive:
             for log in self.log_path.glob(f"{self.target}*"):
-                archive.write(log)
+                archive.write(log, log.name)
                 os.remove(log)
 
         if self.samba_server_ip and self.samba_login and self.samba_password:
-            self.samba_log_upload(arhive_name)
+            archives = list(self.log_path.glob(f"old_{self.target}*"))
+
+            returncode = self.samba_log_upload(archives)
         else:
             print("Samba settings are incorrect")
+            return
 
-    def delete_old(self, delete='log'):
+        if returncode:
+            self.delete_old(delete='archive')
+
+    def delete_old(self, delete='log', exceptions=[]):
         if delete == 'archive':
             olds = list(self.log_path.glob(f"old_{self.target}*"))
         elif delete == 'log':
@@ -105,3 +110,9 @@ class LogProcessing():
                                                                                                                      file,
                                                                                                                      output_file),
                                         shell=True)
+
+            # returncode 0 - success, 1 - error
+            if load_files.returncode:
+                return False
+
+        return True

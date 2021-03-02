@@ -23,4 +23,4 @@ if __name__ == '__main__':
                     sys.exit()
             print(f"CPU temperature: {temp}\r", end='')
             time.sleep(0.5)
-        print("\nTemperature is stable, CPU test will passed")
+        print("\nTemperature is stable, CPU test will passed.")

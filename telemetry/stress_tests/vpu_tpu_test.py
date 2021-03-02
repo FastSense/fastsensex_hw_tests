@@ -16,12 +16,6 @@ myriad_temp = 0
 coral_temp = 0
 
 
-def system_check(iecore):
-    #iecore.get_metric()
-
-    return True
-
-
 class OpenvinoThread(Thread):
     def __init__(self):
         super().__init__()
@@ -96,14 +90,15 @@ if __name__ == '__main__':
 
     openvino_thread = OpenvinoThread()
     tflite_thread = TFliteThread()
-    #openvino_thread.start()
+    openvino_thread.start()
     tflite_thread.start()
 
     try:
         while time.time() < start_time + max_stress_time:
-            print(f"Myriad temp: {openvino_thread.temperature:.2f}. Coral temp: {coral_temp}\r", end='')
+            if openvino_thread.temperature != 0 or tflite_thread.temperature != 0:
+                print(f"Myriad temp: {openvino_thread.temperature:.2f}. Coral temp: {tflite_thread.temperature}\r", end='')
             time.sleep(0.5)
     except:
         sys.exit()
 
-    print("Pass")
+    print("\nTemperature is stable, accelerator test will passed.")

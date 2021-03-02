@@ -35,7 +35,7 @@ class OpenvinoThread(Thread):
 
         while time.time() < start_time + max_stress_time:
             boxes, info = openvino_model(openvino_image, return_info=True)
-            self.temperature = openvino_model.model.ie.get_metric(metric_name="DEVICE_THERMAL", device_name="MYRIAD")
+            self.temperature = round(openvino_model.model.ie.get_metric(metric_name="DEVICE_THERMAL", device_name="MYRIAD"), 2)
             if self.temperature > warning_temp:
                 print("Warning {}".format(warning_temp))
             elif self.temperature > critical_temp:
@@ -44,7 +44,7 @@ class OpenvinoThread(Thread):
 
 
 class TFliteThread(Thread):
-    def __init__(self):
+    def __init__(self, device_id):
         super().__init__()
         self.temperature = 0
         self.start_time = time.time()
@@ -53,15 +53,16 @@ class TFliteThread(Thread):
         self.warning_temp = 80
         self.critical_temp = 100
 
-        self.device = "TPU"
+        self.device_id = device_id
+        self.device = f"TPU:{self.device_id}"
+        print(self.device)
 
     def run(self):
         tflite_model = nnio.zoo.edgetpu.detection.SSDMobileNet(self.device)
         tflite_preproc = tflite_model.get_preprocessing()
         tflite_image = tflite_preproc('dogs.jpg')
 
-        device_id = 0
-        coral_temp_path = Path(f"/sys/class/apex/apex_{device_id}/temp")
+        coral_temp_path = Path(f"/sys/class/apex/apex_{self.device_id}/temp")
 
         with open(coral_temp_path, 'r') as coral_temp:
             while time.time() < start_time + max_stress_time:
@@ -77,28 +78,73 @@ class TFliteThread(Thread):
                     break
 
 
+def check_devices():
+    device_ids = []
+    apex_path = Path('/sys/class/apex/')
+    for device in apex_path.glob('apex_*'):
+        device_ids.append(str(device).split('_')[1])
+    return device_ids
+
+
+class NPUError(Exception):
+    pass
+
 if __name__ == '__main__':
     critical_temp = 100
     warning_temp = 80
 
     start_time = time.time()
 
-
     img_data = requests.get(URL_TEST_IMAGE).content
     with open('dogs.jpg', 'wb') as image_file:
         image_file.write(img_data)
 
-    openvino_thread = OpenvinoThread()
-    tflite_thread = TFliteThread()
-    openvino_thread.start()
-    tflite_thread.start()
+    tflite_threads = []
+    openvino_threads = []
+
+    coral_ids = check_devices()
+    if coral_ids:
+        for coral_device in coral_ids:
+            tflite_thread = TFliteThread(coral_device)
+            tflite_threads.append(tflite_thread)
+    else:
+        print("Couldn't find coral devices")
+
+    openvino_threads.append(OpenvinoThread())
+
+    for tflite_thread in tflite_threads: tflite_thread.start()
+    for openvino_thread in openvino_threads: openvino_thread.start()
 
     try:
         while time.time() < start_time + max_stress_time:
-            if openvino_thread.temperature != 0 or tflite_thread.temperature != 0:
-                print(f"Myriad temp: {openvino_thread.temperature:.2f}. Coral temp: {tflite_thread.temperature}\r", end='')
+            output_string = ""
+            if openvino_threads and tflite_threads:
+                output_string += "Myriad temp-{"
+                for count, openvino_thread in enumerate(openvino_threads):
+                    output_string += f"d{count}:{openvino_thread.temperature:.2f}, "
+                output_string = output_string[:-2] + "}. Coral temp-{"
+                for count, tflite_thread in enumerate(tflite_threads):
+                    output_string += f"d{count}:{tflite_thread.temperature:.2f}, "
+                output_string = output_string[:-2] + '}\r'
+                print(output_string, end='')
+            elif openvino_threads:
+                output_string += "Myriad temp-{"
+                for count, openvino_thread in enumerate(openvino_threads):
+                    output_string += f"d{count}:{openvino_thread.temperature:.2f}, "
+                output_string = output_string[:-2] + '}\r'
+            elif tflite_threads:
+                output_string += "Coral temp:"
+                for count, tflite_thread in enumerate(tflite_threads):
+                    output_string += f"d{count}:{tflite_thread.temperature:.2f}, "
+                output_string = output_string[:-2] + '}\r'
+            else:
+                raise NPUError
+            print(output_string, end='')
             time.sleep(0.5)
-    except:
+    except Exception as exc:
+        if exc == NPUError:
+            print("Couldn't find NPU")
+        print("Exit")
         sys.exit()
 
-    print("\nTemperature is stable, accelerator test will passed.")
+    print("\nTemperature is stable, neural processing unit test will passed.")

@@ -94,6 +94,8 @@ class LogProcessing():
             self.archive_logs(first_log_time.strftime(f"{self.datetime_format}"),
                               last_log_time.strftime(f"{self.datetime_format}"))
 
+        return archive
+
     def samba_log_upload(self, input_files):
         if not isinstance(input_files, list):
             input_files = [input_files]

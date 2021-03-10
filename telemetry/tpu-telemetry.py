@@ -15,8 +15,9 @@ from log_processing_utils import LogProcessing
 
 # Max log size in bytes (10Mb)
 max_logs_size = 1024 * 1024 * 10
+log_period = 1 # days
 
-datetime_format = "Y-%m-%d_%H-%M-%S"
+datetime_format = "%Y-%m-%d_%H-%M-%S"
 
 device_name = socket.gethostname()
 target = "tpu"
@@ -32,7 +33,7 @@ def start_logging(log_file_path, device):
     field_names.append('tpu_temp')
     check_size_time = 0
 
-    lprocessor = LogProcessing(log_file_path, target, device_name, datetime_format, max_logs_size)
+    lprocessor = LogProcessing(log_file_path, target, device_name, datetime_format, max_logs_size, log_period)
     lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
 
     lprocessor.check_old_logs()
@@ -44,7 +45,7 @@ def start_logging(log_file_path, device):
         devices = []
 
         log_file_names = lprocessor.log_file_path_gen(device_ids)
-        
+
 
         with ExitStack() as file_stack, ExitStack() as temp_process_stack:
             for id_num in range(len(device_ids)):

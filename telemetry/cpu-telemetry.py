@@ -40,7 +40,6 @@ OUTPUT_TEMPLATE = """
 
 def start_logging(csv_file_path: str):
     check_time = 0
-    logging_time = tim
 
     lprocessor = LogProcessing(Path(csv_file_path).parents[0], target, device_name, datetime_format, max_logs_size, log_period)
     lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
@@ -83,8 +82,8 @@ def start_logging(csv_file_path: str):
                     writer.writerow(row)
                     f.flush()
 
-                    if check_size_time < time.time():
-                        check_size_time = time.time() + 30
+                    if check_time < time.time():
+                        check_time = time.time() + 30
                         if lprocessor.check_logs_size() or lprocessor.check_old_logs():
                             break
 

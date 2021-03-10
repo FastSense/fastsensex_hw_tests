@@ -19,8 +19,9 @@ start_time = time.time()
 
 # Max log size in bytes (10Mb)
 max_logs_size = 1024 * 1024 * 10
+log_period = 1 # days
 
-datetime_format = "Y-%m-%d_%H-%M-%S"
+datetime_format = "%Y-%m-%d_%H-%M-%S"
 
 device_name = socket.gethostname()
 target = "cpu"
@@ -38,9 +39,10 @@ OUTPUT_TEMPLATE = """
 
 
 def start_logging(csv_file_path: str):
-    check_size_time = 0
+    check_time = 0
+    logging_time = tim
 
-    lprocessor = LogProcessing(Path(csv_file_path).parents[0], target, device_name, datetime_format, max_logs_size)
+    lprocessor = LogProcessing(Path(csv_file_path).parents[0], target, device_name, datetime_format, max_logs_size, log_period)
     lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
 
     lprocessor.check_old_logs()
@@ -48,7 +50,6 @@ def start_logging(csv_file_path: str):
     while True:
         path = Path(csv_file_path)
         path.parents[0].mkdir(parents=True, exist_ok=True)
-
 
         with path.open(mode='w', newline='') as f:
             field_names = ['time']
@@ -83,8 +84,8 @@ def start_logging(csv_file_path: str):
                     f.flush()
 
                     if check_size_time < time.time():
-                        check_size_time = time.time() + 10
-                        if lprocessor.check_logs_size():
+                        check_size_time = time.time() + 30
+                        if lprocessor.check_logs_size() or lprocessor.check_old_logs():
                             break
 
                     time.sleep(1)

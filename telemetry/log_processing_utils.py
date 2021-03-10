@@ -6,12 +6,13 @@ from zipfile import ZipFile
 
 
 class LogProcessing():
-    def __init__(self, log_path, target, device_name, datetime_format, max_log_size):
+    def __init__(self, log_path, target, device_name, datetime_format, max_log_size, log_period):
         self.log_path = log_path
         self.target = target
         self.device_name = device_name
         self.datetime_format = datetime_format
         self.max_log_size = max_log_size
+        self.log_period = log_period
 
     def samba_setup(self, samba_ip, samba_login, samba_password):
         self.samba_server_ip = samba_ip
@@ -30,7 +31,7 @@ class LogProcessing():
             return False
 
     def archive_logs(self, first_time, last_time):
-        arhive_name = f"{self.log_path}/old_{self.target}.{first_time}-{last_time}.zip"
+        arhive_name = f"{self.log_path}/old_{self.target}.({first_time}&{last_time}).zip"
 
         with ZipFile(arhive_name, 'w') as archive:
             for log in self.log_path.glob(f"{self.target}*"):
@@ -77,22 +78,21 @@ class LogProcessing():
         for old_log in self.log_path.glob(f"{self.target}*"):
             file_time = old_log.stem
             # Divides the string according to the standard time format
-            # Searches for the first occurrence of a letter specifying the year 'Y'
-            file_time = file_time[file_time.find('Y'):]
+            file_time =file_time.split('_')[1:]
+            file_time = '_'.join(file_time)
             file_time = datetime.datetime.strptime(file_time, self.datetime_format)
-            print(file_time)
 
             if file_time < first_log_time:
                 first_log_time = file_time
             if file_time > last_log_time:
                 last_log_time = file_time
 
-            if file_time.day + 2 < current_time.day:
+            if file_time.day + self.log_period < current_time.day:
                 archive = True
 
         if archive:
-            self.archive_logs(first_log_time.strftime(f"{self.datetime_format[2:]}"),
-                              last_log_time.strftime(f"{self.datetime_format[2:]}"))
+            self.archive_logs(first_log_time.strftime(f"{self.datetime_format}"),
+                              last_log_time.strftime(f"{self.datetime_format}"))
 
     def samba_log_upload(self, input_files):
         if not isinstance(input_files, list):

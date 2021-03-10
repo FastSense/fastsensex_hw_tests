@@ -44,6 +44,7 @@ def start_logging(log_file_path, device):
         devices = []
 
         log_file_names = lprocessor.log_file_path_gen(device_ids)
+        
 
         with ExitStack() as file_stack, ExitStack() as temp_process_stack:
             for id_num in range(len(device_ids)):
@@ -67,8 +68,8 @@ def start_logging(log_file_path, device):
                     print(tpu_temp)
 
                 if check_size_time < time.time():
-                    check_size_time = time.time() + 10
-                    if lprocessor.check_logs_size():
+                    check_size_time = time.time() + 30
+                    if lprocessor.check_logs_size() or lprocessor.check_old_logs():
                         break
 
                 time.sleep(1)

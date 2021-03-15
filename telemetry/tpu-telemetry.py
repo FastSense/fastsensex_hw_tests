@@ -36,7 +36,8 @@ def start_logging(log_file_path, device):
     lprocessor = LogProcessing(log_file_path, target, device_name, datetime_format, max_logs_size, log_period)
     lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
 
-    lprocessor.check_old_logs()
+    if lprocessor.check_logs_size() or lprocessor.check_old_logs():
+        lprocessor.archive_logs()
 
     device_ids = check_devices()
 
@@ -45,7 +46,6 @@ def start_logging(log_file_path, device):
         devices = []
 
         log_file_names = lprocessor.log_file_path_gen(device_ids)
-
 
         with ExitStack() as file_stack, ExitStack() as temp_process_stack:
             for id_num in range(len(device_ids)):
@@ -71,11 +71,12 @@ def start_logging(log_file_path, device):
                 if check_size_time < time.time():
                     check_size_time = time.time() + 30
                     if lprocessor.check_logs_size() or lprocessor.check_old_logs():
+                        print('break')
                         break
 
                 time.sleep(1)
 
-        lprocessor.check_old_logs(archive=True)
+        lprocessor.archive_logs()
 
 
 def check_devices():
@@ -102,3 +103,4 @@ if __name__ == '__main__':
     print(f"device for temperature readings /sys/class/apex/apex_{args.d}")
 
     start_logging(log_file_path, args.d)
+

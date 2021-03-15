@@ -44,7 +44,8 @@ def start_logging(csv_file_path: str):
     lprocessor = LogProcessing(Path(csv_file_path).parents[0], target, device_name, datetime_format, max_logs_size, log_period)
     lprocessor.samba_setup(samba_server_ip, samba_login, samba_password)
 
-    lprocessor.check_old_logs()
+    if lprocessor.check_logs_size() or lprocessor.check_old_logs():
+        lprocessor.archive_logs()
 
     while True:
         path = Path(csv_file_path)
@@ -91,7 +92,7 @@ def start_logging(csv_file_path: str):
             except KeyboardInterrupt:
                 return
 
-        lprocessor.check_old_logs(archive=True)
+        lprocessor.archive_logs()
         csv_file_path = str(Path.home() / '.telemetry' / datetime.datetime.now().strftime(f"{target}_{datetime_format}")) + '.csv'
 
 
@@ -190,3 +191,4 @@ if __name__ == '__main__':
     else:
         start_logging(args.out)
         save_chart(args.out, args.chart)
+

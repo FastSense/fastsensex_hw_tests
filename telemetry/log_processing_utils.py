@@ -14,6 +14,9 @@ class LogProcessing():
         self.max_log_size = max_log_size
         self.log_period = log_period
 
+        self.start_log_time = datetime.datetime.now()
+        self.stop_log_time = self.start_log_time
+
     def samba_setup(self, samba_ip, samba_login, samba_password):
         self.samba_server_ip = samba_ip
         self.samba_login = samba_login
@@ -30,8 +33,12 @@ class LogProcessing():
         else:
             return False
 
-    def archive_logs(self, first_time, last_time):
-        arhive_name = f"{self.log_path}/old_{self.target}.({first_time}&{last_time}).zip"
+    def archive_logs(self):
+        print('time')
+        if self.start_log_time == self.stop_log_time:
+            self.stop_log_time = datetime.datetime.now()
+        arhive_name = f"{self.log_path}/old_{self.target}.({self.start_log_time.strftime(self.datetime_format)}&{self.stop_log_time.strftime(self.datetime_format)}).zip"
+        print(arhive_name)
 
         with ZipFile(arhive_name, 'w') as archive:
             for log in self.log_path.glob(f"{self.target}*"):
@@ -70,46 +77,41 @@ class LogProcessing():
                                                   datetime.datetime.now().strftime(f"{self.datetime_format}")))
         return paths
 
-    def check_old_logs(self, archive=False):
+    def check_old_logs(self):
         current_time = datetime.datetime.now()
-        first_log_time = current_time
-        last_log_time = current_time
+        result = False
 
         for old_log in self.log_path.glob(f"{self.target}*"):
             file_time = old_log.stem
             # Divides the string according to the standard time format
-            file_time =file_time.split('_')[1:]
+            file_time = file_time.split('_')[1:]
             file_time = '_'.join(file_time)
             file_time = datetime.datetime.strptime(file_time, self.datetime_format)
 
-            if file_time < first_log_time:
-                first_log_time = file_time
-            if file_time > last_log_time:
-                last_log_time = file_time
+            if file_time < self.start_log_time:
+                self.start_log_time = file_time
+            if file_time > self.stop_log_time:
+                self.stop_log_time = file_time
 
-            if file_time.day + self.log_period < current_time.day:
-                archive = True
+            if file_time + datetime.timedelta(days=self.log_period) < current_time:
+                result = True
 
-        if archive:
-            self.archive_logs(first_log_time.strftime(f"{self.datetime_format}"),
-                              last_log_time.strftime(f"{self.datetime_format}"))
-
-        return archive
+        return result
 
     def samba_log_upload(self, input_files):
         if not isinstance(input_files, list):
             input_files = [input_files]
 
-        for file in input_files:
+        for upload_file_name in input_files:
             if not isinstance(input_files, Path):
-                file = Path(file)
+                upload_file_name = Path(upload_file_name)
 
-            output_file = f"/telemetry/{self.device_name}/{file.name}"
+            output_file = f"/telemetry/{self.device_name}/{upload_file_name.name}"
             load_files = subprocess.run("smbclient //{}/fssamba -U {}%{} -c 'mkdir /telemetry/{}; put {} {}'".format(self.samba_server_ip,
                                                                                                                      self.samba_login,
                                                                                                                      self.samba_password,
                                                                                                                      self.device_name,
-                                                                                                                     file,
+                                                                                                                     upload_file_name,
                                                                                                                      output_file),
                                         shell=True)
 
